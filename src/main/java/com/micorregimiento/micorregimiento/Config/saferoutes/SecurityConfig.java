@@ -30,7 +30,7 @@ public class SecurityConfig {
     @Bean
     public SecurityFilterChain filterChain(HttpSecurity http) throws Exception {
         http
-                // Habilitar CORS con la configuración personalizada
+                // CORS con configuración corregida
                 .cors(cors -> cors.configurationSource(corsConfigurationSource))
 
                 // Deshabilitar CSRF para APIs REST
@@ -48,6 +48,9 @@ public class SecurityConfig {
                         .requestMatchers("/api/v1/register/public").permitAll()
                         .requestMatchers("/api/v1/register/roles").permitAll()
                         .requestMatchers("/api/public/**").permitAll()
+
+                        // Endpoints de publicaciones (requieren autenticación)
+                        .requestMatchers("/api/v1/publicaciones/**").authenticated()
 
                         // Endpoints que requieren autenticación
                         .requestMatchers("/api/v1/register/admin").authenticated()
