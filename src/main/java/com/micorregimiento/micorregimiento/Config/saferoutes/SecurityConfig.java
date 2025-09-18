@@ -1,6 +1,5 @@
 package com.micorregimiento.micorregimiento.Config.saferoutes;
 
-
 import com.micorregimiento.micorregimiento.Generics.interfaces.IJwtService;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.context.annotation.Bean;
@@ -48,12 +47,19 @@ public class SecurityConfig {
                         .requestMatchers("/api/v1/register/public").permitAll()
                         .requestMatchers("/api/v1/register/roles").permitAll()
                         .requestMatchers("/api/public/**").permitAll()
+                        .requestMatchers("/api/v1/publicaciones/all").permitAll()
+                        // Endpoints de Swagger y OpenAPI (públicos)
+                        .requestMatchers(
+                                "/swagger-ui.html",
+                                "/swagger-ui/**",
+                                "/v3/api-docs/**",
+                                "/api-docs/**"
+                        ).permitAll()
 
-                        // Endpoints de publicaciones (requieren autenticación)
-                        .requestMatchers("/api/v1/publicaciones/**").authenticated()
 
                         // Endpoints que requieren autenticación
                         .requestMatchers("/api/v1/register/admin").authenticated()
+                        .requestMatchers("/api/v1/publicaciones/**").authenticated()
                         .requestMatchers("/api/v1/admin/**").authenticated()
                         .anyRequest().authenticated()
                 )

@@ -9,10 +9,12 @@ import jakarta.persistence.PersistenceContext;
 import jakarta.persistence.TypedQuery;
 import jakarta.transaction.Transactional;
 
+import java.util.ArrayList;
 import java.util.List;
 
 @Service
 public class PublicationService implements IpublicationService {
+
 
     @PersistenceContext
     private EntityManager entityManager;
@@ -20,13 +22,19 @@ public class PublicationService implements IpublicationService {
     @Override
     @Transactional
     public Epublications createPublicacion(Epublications publicacion, List<Long> barrioIds, List<Long> corregimientoIds) {
+        // Ejecutar todas las validaciones antes de procesar
+        validatePublicacionData(barrioIds, corregimientoIds);
+
         entityManager.persist(publicacion);
         entityManager.flush();
 
-        // Crear ubicaciones
+        // Crear ubicaciones para barrios
         if (barrioIds != null && !barrioIds.isEmpty()) {
             for (Long barrioId : barrioIds) {
                 Long corregimientoId = getCorregimientoIdByBarrioId(barrioId);
+                if (corregimientoId == null) {
+                    throw new RuntimeException("El barrio " + barrioId + " no tiene un corregimiento válido asociado");
+                }
                 Epublicationlocation ubicacion = new Epublicationlocation();
                 ubicacion.setPublicacionId(publicacion.getId());
                 ubicacion.setBarrioId(barrioId);
@@ -35,11 +43,12 @@ public class PublicationService implements IpublicationService {
             }
         }
 
+        // Crear ubicaciones para corregimientos - USAR null en lugar de 0L
         if (corregimientoIds != null && !corregimientoIds.isEmpty()) {
             for (Long corregimientoId : corregimientoIds) {
                 Epublicationlocation ubicacion = new Epublicationlocation();
                 ubicacion.setPublicacionId(publicacion.getId());
-                ubicacion.setBarrioId(0L); // 0 indica que es para todo el corregimiento
+                ubicacion.setBarrioId(null); // CAMBIADO: usar null en lugar de 0L
                 ubicacion.setCorregimientoId(corregimientoId);
                 entityManager.persist(ubicacion);
             }
@@ -53,8 +62,11 @@ public class PublicationService implements IpublicationService {
     public Epublications updatePublicacion(Long id, Epublications publicacion, List<Long> barrioIds, List<Long> corregimientoIds) {
         Epublications existing = entityManager.find(Epublications.class, id);
         if (existing == null) {
-            return null;
+            throw new RuntimeException("Publicación no encontrada con ID: " + id);
         }
+
+        // Ejecutar todas las validaciones antes de procesar
+        validatePublicacionData(barrioIds, corregimientoIds);
 
         existing.setTitulo(publicacion.getTitulo());
         existing.setContenido(publicacion.getContenido());
@@ -66,10 +78,13 @@ public class PublicationService implements IpublicationService {
                 .setParameter("publicacionId", id)
                 .executeUpdate();
 
-        // Crear nuevas ubicaciones
+        // Crear nuevas ubicaciones para barrios
         if (barrioIds != null && !barrioIds.isEmpty()) {
             for (Long barrioId : barrioIds) {
                 Long corregimientoId = getCorregimientoIdByBarrioId(barrioId);
+                if (corregimientoId == null) {
+                    throw new RuntimeException("El barrio " + barrioId + " no tiene un corregimiento válido asociado");
+                }
                 Epublicationlocation ubicacion = new Epublicationlocation();
                 ubicacion.setPublicacionId(id);
                 ubicacion.setBarrioId(barrioId);
@@ -78,11 +93,12 @@ public class PublicationService implements IpublicationService {
             }
         }
 
+        // Crear nuevas ubicaciones para corregimientos - USAR null
         if (corregimientoIds != null && !corregimientoIds.isEmpty()) {
             for (Long corregimientoId : corregimientoIds) {
                 Epublicationlocation ubicacion = new Epublicationlocation();
                 ubicacion.setPublicacionId(id);
-                ubicacion.setBarrioId(0L);
+                ubicacion.setBarrioId(null); // CAMBIADO: usar null en lugar de 0L
                 ubicacion.setCorregimientoId(corregimientoId);
                 entityManager.persist(ubicacion);
             }
@@ -117,15 +133,22 @@ public class PublicationService implements IpublicationService {
 
     @Override
     public List<Epublications> getPublicacionesByBarrioId(Long barrioId) {
+        // Primero obtener el corregimiento del barrio
+        Long corregimientoId = getCorregimientoIdByBarrioId(barrioId);
+        if (corregimientoId == null) {
+            throw new RuntimeException("El barrio " + barrioId + " no tiene un corregimiento válido asociado");
+        }
+
         String jpql = """
             SELECT DISTINCT p FROM Epublications p 
             JOIN Epublicationlocation pu ON p.id = pu.publicacionId 
-            WHERE pu.barrioId = :barrioId OR (pu.barrioId = 0 AND pu.corregimientoId = 
-                (SELECT b.corregimientoId FROM Eneighborhoods b WHERE b.id = :barrioId))
+            WHERE (pu.barrioId = :barrioId) OR 
+                  (pu.barrioId IS NULL AND pu.corregimientoId = :corregimientoId)
             ORDER BY p.fechaPublicacion DESC
             """;
         TypedQuery<Epublications> query = entityManager.createQuery(jpql, Epublications.class);
         query.setParameter("barrioId", barrioId);
+        query.setParameter("corregimientoId", corregimientoId);
         return query.getResultList();
     }
 
@@ -150,12 +173,115 @@ public class PublicationService implements IpublicationService {
         return query.getResultList();
     }
 
+    // MÉTODO CENTRALIZADO PARA TODAS LAS VALIDACIONES
+    private void validatePublicacionData(List<Long> barrioIds, List<Long> corregimientoIds) {
+        // Validar que al menos una ubicación esté especificada
+        if ((barrioIds == null || barrioIds.isEmpty()) &&
+                (corregimientoIds == null || corregimientoIds.isEmpty())) {
+            throw new RuntimeException("Debe especificar al menos un barrio o corregimiento");
+        }
+
+        // Validar que los barrios existan
+        if (barrioIds != null && !barrioIds.isEmpty()) {
+            List<Long> barriosInvalidos = validateBarriosExist(barrioIds);
+            if (!barriosInvalidos.isEmpty()) {
+                throw new RuntimeException("Los siguientes barrios no existen: " + barriosInvalidos);
+            }
+        }
+
+        // Validar que los corregimientos existan
+        if (corregimientoIds != null && !corregimientoIds.isEmpty()) {
+            List<Long> corregimientosInvalidos = validateCorregimientosExist(corregimientoIds);
+            if (!corregimientosInvalidos.isEmpty()) {
+                throw new RuntimeException("Los siguientes corregimientos no existen: " + corregimientosInvalidos);
+            }
+        }
+
+        // Validar coherencia entre barrios y corregimientos
+        if (barrioIds != null && !barrioIds.isEmpty() &&
+                corregimientoIds != null && !corregimientoIds.isEmpty()) {
+            String incoherencia = validateBarrioCorregimientoCoherence(barrioIds, corregimientoIds);
+            if (incoherencia != null) {
+                throw new RuntimeException(incoherencia);
+            }
+        }
+    }
+
+    // Método para validar que los barrios existan
+    private List<Long> validateBarriosExist(List<Long> barrioIds) {
+        List<Long> barriosInvalidos = new ArrayList<>();
+
+        for (Long barrioId : barrioIds) {
+            String jpql = "SELECT COUNT(b) FROM Eneighborhoods b WHERE b.id = :barrioId";
+            TypedQuery<Long> query = entityManager.createQuery(jpql, Long.class);
+            query.setParameter("barrioId", barrioId);
+            Long count = query.getSingleResult();
+
+            if (count == 0) {
+                barriosInvalidos.add(barrioId);
+            }
+        }
+
+        return barriosInvalidos;
+    }
+
+    // Método para validar que los corregimientos existan
+    private List<Long> validateCorregimientosExist(List<Long> corregimientoIds) {
+        List<Long> corregimientosInvalidos = new ArrayList<>();
+
+        for (Long corregimientoId : corregimientoIds) {
+            String jpql = "SELECT COUNT(c) FROM Ecorregimientos c WHERE c.id = :corregimientoId";
+            TypedQuery<Long> query = entityManager.createQuery(jpql, Long.class);
+            query.setParameter("corregimientoId", corregimientoId);
+            Long count = query.getSingleResult();
+
+            if (count == 0) {
+                corregimientosInvalidos.add(corregimientoId);
+            }
+        }
+
+        return corregimientosInvalidos;
+    }
+
+    // Método para validar coherencia entre barrios y corregimientos
+    private String validateBarrioCorregimientoCoherence(List<Long> barrioIds, List<Long> corregimientoIds) {
+        for (Long barrioId : barrioIds) {
+            // Obtener el corregimiento al que pertenece este barrio
+            Long barrioCorregimientoId = getCorregimientoIdByBarrioId(barrioId);
+
+            if (barrioCorregimientoId == null) {
+                return String.format("El barrio %d no existe o no tiene corregimiento asociado", barrioId);
+            }
+
+            // Verificar si el corregimiento del barrio está en la lista de corregimientos especificados
+            if (!corregimientoIds.contains(barrioCorregimientoId)) {
+                return String.format(
+                        "El barrio %d pertenece al corregimiento %d, pero se especificó para los corregimientos %s. " +
+                                "Los barrios deben pertenecer a los corregimientos indicados.",
+                        barrioId, barrioCorregimientoId, corregimientoIds
+                );
+            }
+        }
+        return null; // Todo es coherente
+    }
+
+    @Override
+    public List<Epublications> getAllPublicaciones() {
+        String jpql = "SELECT p FROM Epublications p ORDER BY p.fechaPublicacion DESC";
+        TypedQuery<Epublications> query = entityManager.createQuery(jpql, Epublications.class);
+        return query.getResultList();
+    }
+
     private Long getCorregimientoIdByBarrioId(Long barrioId) {
-        String jpql = "SELECT b.corregimientoId FROM Eneighborhoods b WHERE b.id = :barrioId";
-        TypedQuery<Integer> query = entityManager.createQuery(jpql, Integer.class);
-        query.setParameter("barrioId", barrioId);
-        List<Integer> results = query.getResultList();
-        return results.isEmpty() ? 0L : results.get(0).longValue();
+        try {
+            String jpql = "SELECT b.corregimientoId FROM Eneighborhoods b WHERE b.id = :barrioId";
+            TypedQuery<Integer> query = entityManager.createQuery(jpql, Integer.class);
+            query.setParameter("barrioId", barrioId);
+            List<Integer> results = query.getResultList();
+            return results.isEmpty() ? null : results.get(0).longValue();
+        } catch (Exception e) {
+            throw new RuntimeException("Error al obtener corregimiento para barrio: " + barrioId, e);
+        }
     }
 }
 

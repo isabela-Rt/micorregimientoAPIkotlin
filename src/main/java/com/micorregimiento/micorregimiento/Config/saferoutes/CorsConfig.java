@@ -15,12 +15,8 @@ public class CorsConfig implements WebMvcConfigurer {
 
     // URLs permitidas - REEMPLAZA CON TUS URLs REALES
     private static final List<String> ALLOWED_ORIGINS = Arrays.asList(
-            "http://localhost:3000",          // React local
-            "http://localhost:4200",          // Angular local
-            "http://localhost:8080",          // Otro frontend local
-            "http://127.0.0.1:3000",          // Localhost alternativo
-            "https://tu-dominio.com",         // Producción (reemplazar)
-            "https://www.tu-dominio.com"      // Producción con www (reemplazar)
+            "http://localhost:9090",          // Otro frontend local
+            "http://127.0.0.1:3000"        // Localhost alternativo
     );
 
     @Bean
@@ -66,4 +62,3 @@ public class CorsConfig implements WebMvcConfigurer {
         return source;
     }
 }
-

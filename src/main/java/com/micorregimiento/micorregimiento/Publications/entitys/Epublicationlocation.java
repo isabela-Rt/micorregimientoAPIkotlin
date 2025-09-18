@@ -1,8 +1,6 @@
 package com.micorregimiento.micorregimiento.Publications.entitys;
 
 import jakarta.persistence.*;
-import jakarta.validation.constraints.Email;
-import jakarta.validation.constraints.NotBlank;
 import lombok.Data;
 import lombok.NoArgsConstructor;
 import lombok.AllArgsConstructor;
@@ -21,8 +19,8 @@ public class Epublicationlocation {
     @Column(name = "publicacion_id", nullable = false)
     private Long publicacionId;
 
-    @Column(name = "barrio_id", nullable = false)
-    private Long barrioId;
+    @Column(name = "barrio_id")
+    private Long barrioId; // aceptar null
 
     @Column(name = "corregimiento_id", nullable = false)
     private Long corregimientoId;
@@ -34,5 +32,4 @@ public class Epublicationlocation {
     protected void onCreate() {
         fechaCreacion = LocalDateTime.now();
     }
-
 }

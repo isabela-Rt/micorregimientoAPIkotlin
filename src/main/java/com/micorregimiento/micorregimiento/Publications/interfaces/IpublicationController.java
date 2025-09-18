@@ -12,4 +12,5 @@ public interface IpublicationController {
     PublicacionResponse getPublicacion(Long id);
     List<PublicacionResponse> getMyPublicaciones(Long userId);
     List<PublicacionResponse> getPublicacionesByBarrio(Long barrioId);
+    List<PublicacionResponse> getAllPublicaciones();
 }

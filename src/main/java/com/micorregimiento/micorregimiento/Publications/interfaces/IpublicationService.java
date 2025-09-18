@@ -12,5 +12,6 @@ public interface IpublicationService {
     List<Epublications> getPublicacionesByUserId(Long userId);
     List<Epublications> getPublicacionesByBarrioId(Long barrioId);
     List<Epublications> getPublicacionesByCorregimientoId(Long corregimientoId);
-    List<Epublicationlocation> getUbicacionesByPublicacionId(Long publicacionId);
+    List<Epublicationlocation> getUbicacionesByPublicacionId(Long publicacionId); // CORREGIDO: debe retornar EPublicationLocation
+    List<Epublications> getAllPublicaciones();
 }

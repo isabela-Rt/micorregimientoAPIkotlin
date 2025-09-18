@@ -43,5 +43,4 @@ public class Eneighborhoods {
     protected void onUpdate(){
         fechaActualizacion = LocalDateTime.now();
     }
-
 }

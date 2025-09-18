@@ -108,6 +108,12 @@ public class PublicationEndpoint {
         return ResponseEntity.ok(response);
     }
 
+    @GetMapping("/all")
+    public ResponseEntity<List<PublicacionResponse>> getAllPublicaciones() {
+        List<PublicacionResponse> response = publicacionController.getAllPublicaciones();
+        return ResponseEntity.ok(response);
+    }
+
     private Long extractUserIdFromToken(String authHeader) {
         try {
             String token = authHeader.replace("Bearer ", "");

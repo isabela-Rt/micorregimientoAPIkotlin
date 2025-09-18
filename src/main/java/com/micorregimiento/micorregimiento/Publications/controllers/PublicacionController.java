@@ -15,6 +15,7 @@ import org.springframework.stereotype.Component;
 import java.util.List;
 import java.util.stream.Collectors;
 
+
 @Component
 public class PublicacionController implements IpublicationController {
 
@@ -212,14 +213,15 @@ public class PublicacionController implements IpublicationController {
         List<Epublicationlocation> ubicaciones = publicacionService.getUbicacionesByPublicacionId(publicacion.getId());
 
         List<Long> barrioIds = ubicaciones.stream()
-                .filter(u -> u.getBarrioId() != 0)
                 .map(Epublicationlocation::getBarrioId)
+                .filter(b -> b != null) // solo barrios válidos
                 .distinct()
                 .collect(Collectors.toList());
 
         List<Long> corregimientoIds = ubicaciones.stream()
-                .filter(u -> u.getBarrioId() == 0)
+                .filter(u -> u.getBarrioId() == null) // corregimientos puros
                 .map(Epublicationlocation::getCorregimientoId)
+                .filter(c -> c != null) // seguridad extra
                 .distinct()
                 .collect(Collectors.toList());
 
@@ -235,6 +237,22 @@ public class PublicacionController implements IpublicationController {
                 .exitoso(exitoso)
                 .mensaje(mensaje)
                 .build();
+    }
+
+    @Override
+    public List<PublicacionResponse> getAllPublicaciones() {
+        try {
+            List<Epublications> publicaciones = publicacionService.getAllPublicaciones();
+            return publicaciones.stream()
+                    .map(p -> buildPublicacionResponse(p, true, ""))
+                    .collect(Collectors.toList());
+
+        } catch (Exception e) {
+            return List.of(PublicacionResponse.builder()
+                    .exitoso(false)
+                    .mensaje("Error al obtener todas las publicaciones: " + e.getMessage())
+                    .build());
+        }
     }
 }
 
