@@ -1,8 +1,11 @@
 package com.micorregimiento.micorregimiento.Publications.services;
 
+import com.micorregimiento.micorregimiento.Config.WebhookConfig;
+import com.micorregimiento.micorregimiento.Notifications.interfaces.IWebhookService;
 import com.micorregimiento.micorregimiento.Publications.interfaces.IpublicationService;
 import com.micorregimiento.micorregimiento.Publications.entitys.Epublications;
 import com.micorregimiento.micorregimiento.Publications.entitys.Epublicationlocation;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 import jakarta.persistence.EntityManager;
 import jakarta.persistence.PersistenceContext;
@@ -10,11 +13,19 @@ import jakarta.persistence.TypedQuery;
 import jakarta.transaction.Transactional;
 
 import java.util.ArrayList;
+import java.util.Collections;
 import java.util.List;
+import java.util.Map;
 
 @Service
 public class PublicationService implements IpublicationService {
 
+
+    @Autowired
+    private IWebhookService webhookService;
+
+    @Autowired
+    private WebhookConfig webhookConfig;
 
     @PersistenceContext
     private EntityManager entityManager;
@@ -51,6 +62,32 @@ public class PublicationService implements IpublicationService {
                 ubicacion.setBarrioId(null); // CAMBIADO: usar null en lugar de 0L
                 ubicacion.setCorregimientoId(corregimientoId);
                 entityManager.persist(ubicacion);
+            }
+        }
+
+        // Después de crear la publicación, enviar al webhook
+        if (webhookConfig.isWebhookEnabled()) {
+            try {
+                // Convertir la publicación a un formato adecuado para el webhook
+                Map<String, Object> publicationData = Map.of(
+                        "id", publicacion.getId(),
+                        "titulo", publicacion.getTitulo(),
+                        "contenido", publicacion.getContenido(),
+                        "tipoPublicacionId", publicacion.getTipoPublicacionId(),
+                        "autorId", publicacion.getAutorId(),
+                        "fechaPublicacion", publicacion.getFechaPublicacion(),
+                        "barrioIds", barrioIds != null ? barrioIds : Collections.emptyList(),
+                        "corregimientoIds", corregimientoIds != null ? corregimientoIds : Collections.emptyList()
+                );
+
+                webhookService.sendToWebhook(
+                        webhookConfig.getN8nWebhookUrl(),
+                        publicationData,
+                        "publication_created"
+                );
+            } catch (Exception e) {
+                // No fallar la creación si el webhook falla, solo loggear
+                System.err.println("Error sending to webhook: " + e.getMessage());
             }
         }
 
